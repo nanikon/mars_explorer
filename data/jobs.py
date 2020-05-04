@@ -16,3 +16,7 @@ class Jobs(SqlAlchemyBase):
     start_date = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     end_date = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     is_finished = sqlalchemy.Column(sqlalchemy.Boolean, nullable=True)
+    categories_id = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+    categories = orm.relation("Category",
+                              secondary="association",
+                              backref="jobs")
