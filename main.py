@@ -1,6 +1,6 @@
-from flask import Flask, render_template, redirect, request, abort
+from flask import Flask, render_template, redirect, request, abort, make_response, jsonify
 
-from data import db_session
+from data import db_session, jobs_api, users_api
 from data.users import User
 from data.jobs import Jobs
 from data.departments import Department
@@ -13,6 +13,8 @@ from wtforms.validators import DataRequired
 
 from flask_login import LoginManager, login_user
 from flask_login import login_required, logout_user, current_user
+
+from requests import get
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
@@ -37,6 +39,7 @@ class RegisterForm(FlaskForm):
     position = StringField('Position', validators=[DataRequired()])
     specially = StringField('Specially', validators=[DataRequired()])
     address = StringField('Address', validators=[DataRequired()])
+    city_from = StringField('City_from', validators=[DataRequired()])
     submit = SubmitField('Submit')
 
 
@@ -91,6 +94,7 @@ def register():
         user.speciality = form.specially.data
         user.address = form.address.data
         user.email = form.email.data
+        user.city_from = form.city_from.data
         user.set_password(form.password.data)
         session.add(user)
         session.commit()
@@ -171,8 +175,8 @@ def edit_job(id):
             job.collaborators = form.collaborator.data
             job.is_finished = form.is_finished.data
             job.team_leader = session.query(User).filter(User.id == form.team_leader_id.data).first()
-            # for i in job.categories_id.split(', '):
-                # job.categories.remove(session.query(Category).filter(Category.id == int(i)).first())
+            for i in job.categories_id.split(', '):
+                job.categories.remove(session.query(Category).filter(Category.id == int(i)).first())
             session.commit()
             job.categories_id = form.categories_id.data
             for i in form.categories_id.data.split(', '):
@@ -271,6 +275,26 @@ def dep_delete(id):
     return redirect('/departments')
 
 
+@app.route('/users_show/<int:user_id>')
+def nostalgy(user_id):
+    user = get('http://127.0.0.1:8080/api/user/' + str(user_id)).json()['user']
+    geocoder_request = "http://geocode-maps.yandex.ru/1.x/?apikey=40d1649f-0493-4b70-98ba-" + \
+                       "98533de7710b&geocode=" + user['city_from'] + "&format=json"
+    response = get(geocoder_request)
+    json_response = response.json()
+    toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+    toponym_coodrinates = ','.join(i for i in toponym["Point"]["pos"].split())
+    image_link = "https://static-maps.yandex.ru/1.x/?ll=" + toponym_coodrinates + "&spn=0.1,0.1&l=sat"
+    return render_template('nostalgia.html', title='Hometown', user=user, image_link=image_link)
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return make_response(jsonify({'error': 'Not found'}), 404)
+
+
 if __name__ == '__main__':
     db_session.global_init("db/mars_explorer.sqlite")
+    app.register_blueprint(jobs_api.blueprint)
+    app.register_blueprint(users_api.blueprint)
     app.run(port=8080, host='127.0.0.1')

@@ -10,3 +10,7 @@ h1 {
 .green {
     background-color: #F0FFF0;
 }
+img {
+    display: block;
+    margin: auto;
+}
